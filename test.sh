@@ -161,7 +161,9 @@ $PROJECT --version                                   >out 2>err ; check
 grep "^git-test version" out                    >/dev/null 2>&1 ; check
 
 info "Empty repo should not pass tests"
-git init -q                                     >/dev/null 2>&1
+# Assertions below hardcode the branch name "master".
+git init -q -b master                           >/dev/null 2>&1 \
+    || { git init -q && git symbolic-ref HEAD refs/heads/master ; } >/dev/null 2>&1
 git config user.email "test.user@example.com"   >/dev/null 2>&1
 git config user.name "User deTest"              >/dev/null 2>&1
 
