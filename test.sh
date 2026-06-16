@@ -401,6 +401,35 @@ $PROJECT -v -ra master                               >out 2>err ; check_fail
 grep "Cannot test: You have unstaged changes." err   >/dev/null ; check
 git checkout -- subject                         >/dev/null 2>&1 ; check
 
+info "# Feature: test a dirty work tree when all changes are staged"
+
+$PROJECT --clear                                >/dev/null 2>&1 ; check
+git checkout -- subject                         >/dev/null 2>&1 ; check
+
+info "Stage a change without committing it"
+echo "staged thing with SUT" > subject
+git add subject                                 >/dev/null 2>&1 ; check
+
+info "Should test the staged tree in place, with a null commit hash"
+$PROJECT -v --verify="grep SUT subject"              >out 2>err ; check
+grep "testing the staged tree" out              >/dev/null 2>&1 ; check
+grep "0000000.*pass" out                        >/dev/null 2>&1 ; check
+
+info "Testing in place must not move HEAD or touch the staged change"
+test -z "$(git symbolic-ref -q HEAD | grep -v subject)"         ; check
+git diff --cached --quiet                                       ; check_fail
+
+info "Committing the staged tree reuses the cached result (same tree)"
+git commit -q -m "commit the staged SUT" subject >/dev/null 2>&1 ; check
+$PROJECT -v --verify="grep SUT subject" HEAD ^HEAD~1 >out 2>err ; check
+grep "pass (cached)" out                        >/dev/null 2>&1 ; check
+
+info "Should still refuse when there are unstaged changes"
+echo "now unstaged" >> subject
+$PROJECT -v --verify="grep SUT subject"              >out 2>err ; check_fail
+grep "Cannot test: You have unstaged changes." err   >/dev/null ; check
+git checkout -- subject                         >/dev/null 2>&1 ; check
+
 info "TODO: check output report feature/s"
 
 if [ $verb -ge 1 ]; then

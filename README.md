@@ -47,6 +47,32 @@ For ease, `git-test` offers a few advantages over a simple for loop over a
   an easily referenced symlink farm.
 
 
+## Testing a dirty work tree
+
+Normally `git-test` refuses to run unless the work tree is clean. As a
+convenience it will also run on a *dirty* work tree as long as every change is
+**staged**. In that case it writes the index to a tree and tests it in place:
+no commit object is created and nothing is checked out, so the staged changes
+(and any in-progress merge) are left untouched.
+
+The motivating case is testing a merge resolution before you commit it: resolve
+the conflicts, `git add` them (recording the `rerere` resolution), and run
+`git test` while still mid-merge. Because the cache is keyed on the tree,
+committing that exact tree afterwards — the merge commit — reuses the result
+instead of re-running the test:
+
+    $ git merge topic            # conflicts, resolve, then `git add`
+    $ git test --verify="make test"
+    Work tree is dirty; testing the staged tree in place.
+    iter | commit  | tree    | result
+     ----|---------|---------|--------------
+    0000 | 0000000 | 87f7b7d | pass
+    $ git commit                 # the merge commit has tree 87f7b7d
+    $ git test                   # ... so it's already cached
+
+If there are *unstaged* changes the work tree would not match the tree recorded
+in the cache, so `git-test` falls back to its usual refusal.
+
 ## Configure
 
 Mostly just this:

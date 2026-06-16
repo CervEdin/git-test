@@ -63,7 +63,11 @@ exec 5>&2
 
 rc=0
 atexit_cleanup() {
-    git checkout -q "$starting_point"
+    # In staged mode we tested in place without ever moving HEAD, so leave the
+    # work tree (and any in-progress merge) exactly as we found it.
+    if test -z "$staged_tree" ; then
+        git checkout -q "$starting_point"
+    fi
     unlock
     exit $rc
 }
@@ -204,8 +208,14 @@ link_result() {
 }
 
 run_test() {
-    progress err "checkout"
-    git checkout -q "$commit"
+    if test "$1" = staged ; then
+        # The staged tree is already materialised in the work tree; there is
+        # nothing to check out, so just test where we are.
+        progress err "staged"
+    else
+        progress err "checkout"
+        git checkout -q "$commit"
+    fi
 
     if test -n "$output"; then
         out="${output}/tree/${cache_key}"
@@ -297,6 +307,52 @@ run_tests() {
 
         iteration=$((iteration + 1))
     done
+}
+
+run_staged_test() {
+    iteration=0
+    verification="$(echo "$verify" | git hash-object --stdin)"
+    ver="$(git rev-parse --short=7 "$verification")"
+
+    # The staged tree has a real hash, so cache lookups work as usual, but
+    # there is no commit object backing it -- show a null hash in its place.
+    small=$(git rev-parse --short=7 "$staged_tree")
+    short=0000000
+    cache_key="${small}_${ver}"
+
+    if [ -z "$GIT_QUIET" ]; then
+        gettext "iter | commit  | tree    | result"
+        echo
+        gettext " ----|---------|---------|--------------"
+        echo
+    fi
+
+    result=$(redo_check "$cache_key")
+
+    if test -n "$result"; then
+        if test -z "$GIT_QUIET"; then
+            progress err "cached"
+            progress out "$result (cached)"
+        fi
+    else
+        result=$(run_test staged)
+
+        if test -z "$GIT_QUIET"; then
+            overall=$(recheck_cache "$cache_key")
+
+            if [ "$result" != "$overall" ]; then
+                progress out "$result ($overall)"
+            else
+                progress out "$result"
+            fi
+        fi
+    fi
+
+    if test "$result" = "fail"; then
+        rc=5
+    fi
+
+    link_result
 }
 
 GIT_DIR=$(git rev-parse --git-dir 2>/dev/null || true)
@@ -407,12 +463,31 @@ elif [ -z "$GIT_DIR" ]; then
 else
     set_reflog_action test
     require_work_tree_exists
-    require_clean_work_tree test
     cd_to_toplevel
 
     # Current state
     starting_point=$(git symbolic-ref --short -q HEAD || git rev-parse HEAD)
     now=$(date +%s)
+
+    # git-test normally insists on a clean work tree.  As a convenience we
+    # allow a *dirty* tree as long as every change is staged: the index is
+    # written to a tree object and tested in place.  No commit object is
+    # created and nothing is checked out, so the staged changes are left
+    # untouched.  The motivating case is testing a merge resolution that has
+    # already recorded its rerere entries but is not yet committed.  Because
+    # the cache is keyed on the tree, committing that exact tree later -- the
+    # merge commit -- reuses this result instead of re-running the test.
+    git update-index -q --ignore-submodules --refresh
+    if ! git rev-parse --verify -q HEAD >/dev/null ; then
+        # No commit to diff against (unborn HEAD); defer to git's checks.
+        require_clean_work_tree test
+    elif ! git diff-files --quiet --ignore-submodules ; then
+        # Unstaged changes would make the work tree differ from the tree we
+        # record in the cache, so fall back to git's usual refusal.
+        require_clean_work_tree test
+    elif ! git diff-index --cached --quiet --ignore-submodules HEAD -- ; then
+        staged_tree=$(git write-tree)
+    fi
 fi
 
 if [ $action = clear ]; then
@@ -460,6 +535,16 @@ fi
 lock
 
 trap "atexit_cleanup" INT TERM EXIT
+
+if test -n "$staged_tree" ; then
+    if test -z "$GIT_QUIET" ; then
+        gettext "Work tree is dirty; testing the staged tree in place."
+        echo
+    fi
+    make_output_dirs
+    run_staged_test
+    exit $rc
+fi
 
 refs=( $(decide_refs "$@") )
 commits=( $(git rev-list --reverse "${refs[@]}" -- | tr "$NL" " ") )
