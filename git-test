@@ -86,7 +86,7 @@ unlock() {
 }
 
 
-progress () {
+progress() {
     if [ "$1" = err ] ; then
         if [ -z "$GIT_QUIET" ] ; then
             printf "$CR%04d | %s | %s | " \
