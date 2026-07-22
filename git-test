@@ -27,6 +27,8 @@ git test [options] [refs...]
 
 git test --clear [refs...]
 
+git test sync
+
 Run tests on each distinct tree
 
 Example:
@@ -168,6 +170,31 @@ recheck_cache() {
         results=FLAPPY
     fi
     echo $results
+}
+
+sync_cache() {
+    common="$(git rev-parse --git-common-dir)"
+    synced=0
+
+    for other in "$common"/test-cache "$common"/worktrees/*/test-cache; do
+        test -d "$other" || continue
+        # skip our own cache (compare physical paths; $cache may be overridden)
+        if [ "$(cd "$other" && pwd -P)" = "$(cd "$cache" && pwd -P)" ]; then
+            continue
+        fi
+        for f in "$other"/*_pass "$other"/*_fail; do
+            test -f "$f" || continue
+            name="${f##*/}"
+            if ! test -f "$cache/$name"; then
+                touch "$cache/$name"
+                synced=$((synced + 1))
+            fi
+        done
+    done
+
+    if test -z "$GIT_QUIET"; then
+        echo "$(eval_gettext "Pulled \${synced} results from other worktrees")"
+    fi
 }
 
 redo_check() {
@@ -448,12 +475,27 @@ while test $# != 0; do
     shift
 done
 
+if [ "$1" = sync ]; then
+    action=sync
+    shift
+    if test $# != 0; then
+        gettext "sync takes no arguments" >&2
+        echo >&2
+        exit 129
+    fi
+fi
+
 if [ $action = version ]; then
     echo "git-test version $VERSION"
     exit 0
 elif [ -z "$GIT_DIR" ]; then
     usage
     exit 5
+elif [ $action = sync ]; then
+    lock
+    trap 'unlock' EXIT
+    sync_cache
+    exit 0
 else
     set_reflog_action test
     require_work_tree_exists

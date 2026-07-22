@@ -401,6 +401,48 @@ $PROJECT -v -ra master                               >out 2>err ; check_fail
 grep "Cannot test: You have unstaged changes." err   >/dev/null ; check
 git checkout -- subject                         >/dev/null 2>&1 ; check
 
+info "# Feature: sync across worktrees"
+
+git config test.verify "$verify"
+
+info "Should add a worktree for sync tests"
+WT="$TMPDIR/subject-wt"
+rm -Rf "$WT"
+git worktree add "$WT" master                   >/dev/null 2>&1 ; check
+
+info "Should pull results from another worktree's cache"
+mkdir -p .git/worktrees/subject-wt/test-cache
+touch .git/worktrees/subject-wt/test-cache/${tree_a}_${ver}_pass
+$PROJECT --clear                                >/dev/null 2>&1 ; check
+$PROJECT -v sync                                     >out 2>err ; check
+test -f .git/test-cache/${tree_a}_${ver}_pass                   ; check
+grep "Pulled 1 results" out                     >/dev/null 2>&1 ; check
+
+info "Pulled result should be used as cached"
+rm -f ran_test
+$PROJECT -v master~3                                 >out 2>err ; check
+grep "^0000 .* pass (cached)$" out              >/dev/null 2>&1 ; check
+
+info "Should read a worktree cache even when it is locked"
+mkdir -p .git/worktrees/subject-wt/test-cache/testing
+touch .git/worktrees/subject-wt/test-cache/${tree_b}_${ver}_fail
+$PROJECT -v sync                                     >out 2>err ; check
+test -f .git/test-cache/${tree_b}_${ver}_fail                   ; check
+grep "Pulled 1 results" out                     >/dev/null 2>&1 ; check
+rmdir .git/worktrees/subject-wt/test-cache/testing
+
+info "Should respect our own lock"
+mkdir -p .git/test-cache/testing
+$PROJECT sync                                        >out 2>err ; check_fail
+grep "git-test already in progress" err         >/dev/null 2>&1 ; check
+rmdir .git/test-cache/testing
+
+info "Should reject arguments to sync"
+$PROJECT sync master                                 >out 2>err ; check_fail
+grep "sync takes no arguments" err              >/dev/null 2>&1 ; check
+
+git worktree remove --force "$WT"               >/dev/null 2>&1
+
 info "# Feature: test a dirty work tree when all changes are staged"
 
 $PROJECT --clear                                >/dev/null 2>&1 ; check

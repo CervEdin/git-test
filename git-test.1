@@ -6,6 +6,8 @@ git test [options] [refs...]
 
 git test --clear [refs...]
 
+git test sync
+
 git test --version
 .SH "DESCRIPTION"
 Run tests on each distinct tree in a revision list.
@@ -135,6 +137,10 @@ GIT_TEST_VERIFY and the git-config option test.verify
 \fB\-\-clear\fR
 clear the results cache
 .TP
+\fBsync\fR
+pull cached results from other worktrees. See the \fBSYNCING WORKTREE
+CACHES\fR section
+.TP
 \fB\-\-version\fR
 print version info and quit
 .SH "REDO MODES"
@@ -181,6 +187,19 @@ If refs are supplied when clearing the cache, the trees of the specified
 commits will be cleared, even though those exact trees may appear in other
 commits. It is what was requested and doing anything else would likely be
 prohibitively expensive and very confusing.
+.SH "SYNCING WORKTREE CACHES"
+The results cache is kept per worktree, so identical trees are normally
+re-tested in every worktree. Running
+.IP
+git test sync
+.PP
+copies pass/fail results from every other worktree of the repository into
+the current worktree's cache. The other worktrees are only read, never
+modified \(em even one with a test run in progress; the results it has
+recorded so far are pulled.
+
+Note that "sync" is recognized as an action word: a ref actually named
+sync must be spelled heads/sync (or refs/heads/sync) to be tested.
 .SH "AUTHORS"
 Anders Eurenius <aes@eurenius.eu>
 .SH "COPYRIGHT"
