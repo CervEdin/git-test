@@ -15,3 +15,16 @@ install:
 uninstall:
 	rm -f $(DESTDIR)$(bindir)/git-test
 	rm -f $(DESTDIR)$(mandir)/man1/git-test.1
+
+.PHONY: test
+
+SHELLS = /bin/bash /bin/ksh /bin/mksh /bin/pdksh /bin/dash
+
+test:
+	fail=0; \
+	for shell in $(SHELLS); do \
+		test -x $$shell || { echo "skipping $$shell (not installed)"; continue; }; \
+		echo $$shell; \
+		bash test.sh -v -s $$shell || fail=1; \
+	done; \
+	exit $$fail
