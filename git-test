@@ -72,8 +72,8 @@ lock() {
     mkdir -p "$cache"
     msg="There's a lock dir, as if there is a git-test already in progress."
     if ! mkdir "$cache"/testing >/dev/null 2>&1; then
-        echo "$(eval_gettext "$msg")" 1>& $ERR
-        echo "$(eval_gettext "(lock: \${cache}/testing)")" 1>& $ERR
+        echo "$(eval_gettext "$msg")" 1>&$ERR
+        echo "$(eval_gettext "(lock: \${cache}/testing)")" 1>&$ERR
         rc=5
         exit 5
     fi
@@ -89,16 +89,16 @@ progress() {
     if [ "$1" = err ]; then
         if [ -z "$GIT_QUIET" ]; then
             printf "$CR%04d | %s | %s | " \
-                   "$iteration" "$short" "$small" 1>& $ERR
-            gettext "$2" 1>& $ERR
+                   "$iteration" "$short" "$small" 1>&$ERR
+            gettext "$2" 1>&$ERR
         fi
     else
         if [ -z "$GIT_QUIET" ]; then
-            printf "%s" "$CR" 1>& $ERR
+            printf "%s" "$CR" 1>&$ERR
             printf "%04d | %s | %s | " \
-                   "$iteration" "$short" "$small" 1>& $OUT
-            gettext "$2" 1>& $OUT
-            echo 1>& $OUT
+                   "$iteration" "$short" "$small" 1>&$OUT
+            gettext "$2" 1>&$OUT
+            echo 1>&$OUT
         fi
     fi
 }
@@ -150,7 +150,7 @@ decide_refs() {
 
     if [ -z "$args" ]; then
         gettext "Cowardly refusing to test the entire history.
-(If that's what you really want, you must specify at least HEAD)" >& $ERR
+(If that's what you really want, you must specify at least HEAD)" >&$ERR
         rc=5
     else
         echo "$branch $args" | tr " " "$NL" | sort | uniq | tr "$NL" " "
