@@ -85,7 +85,6 @@ unlock() {
     fi
 }
 
-
 progress() {
     if [ "$1" = err ] ; then
         if [ -z "$GIT_QUIET" ] ; then
@@ -104,7 +103,6 @@ progress() {
     fi
 }
 
-
 tree_of_commit() {
     words=( $(git cat-file -p "$1" | grep tree) )
     printf "%s" "${words[1]}"
@@ -119,7 +117,6 @@ make_output_dirs() {
         ln -s "$now" "$output"/latest
     fi
 }
-
 
 decide_refs() {
     if test -n "$*" ; then
@@ -159,7 +156,6 @@ decide_refs() {
         echo "$branch $args" | tr " " "$NL" | sort | uniq | tr "$NL" " "
     fi
 }
-
 
 check_cache() {
     if test -f "$cache/${1}_pass" ; then pass=pass; else pass='' ; fi
@@ -205,9 +201,7 @@ link_result() {
         ln -sf "$dest" "${output}/commit/${short}_${result}"
     fi
 
-
 }
-
 
 run_test() {
     progress err "checkout"
@@ -253,7 +247,6 @@ run_test() {
     touch "${cache}/${cache_key}_${result}"
     echo $result
 }
-
 
 run_tests() {
     commits=""
@@ -305,7 +298,6 @@ run_tests() {
         iteration=$((iteration + 1))
     done
 }
-
 
 GIT_DIR=$(git rev-parse --git-dir 2>/dev/null || true)
 
