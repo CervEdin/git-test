@@ -101,11 +101,6 @@ progress() {
     fi
 }
 
-tree_of_commit() {
-    words=( $(git cat-file -p "$1" | grep tree) )
-    printf "%s" "${words[1]}"
-}
-
 make_output_dirs() {
     if test -n "$output"; then
         mkdir -p "$output"/commit "$output"/tree "$output"/"$now"
@@ -288,11 +283,13 @@ run_tests() {
         echo " ----|---------|---------|--------------"
     fi
 
-    for commit in "$@"; do
-        tree=$(tree_of_commit "$commit")
-        small=$(git rev-parse --short=7 "$tree")
-        short=$(git rev-parse --short=7 "$commit")
+    # Resolve all commit and tree hashes in a single git invocation;
+    # spawning git per commit dominates the runtime once results are cached.
+    # --abbrev=7 abbreviates exactly like `git rev-parse --short=7`, so
+    # existing cache entries keep matching.
+    batch="$(git show -s --abbrev=7 --format='%H %h %t' "$@")"
 
+    while read -r commit short small; do
         cache_key="${small}_${ver}"
 
         result=$(redo_check "$cache_key")
@@ -323,7 +320,9 @@ run_tests() {
         link_result
 
         iteration=$((iteration + 1))
-    done
+    done <<EOF
+$batch
+EOF
 }
 
 run_staged_test() {
@@ -537,9 +536,7 @@ if [ $action = clear ]; then
             echo "$args will clear $count commits"
         fi
 
-        for commit in $commits; do
-            tree=$(tree_of_commit "$commit")
-            small=$(git rev-parse --short=7 "$tree")
+        for small in $(git show -s --abbrev=7 --format='%t' $commits); do
             rm -f "$cache"/"$small"_*_fail "$cache"/"$small"_*_pass
         done
     fi
