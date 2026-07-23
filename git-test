@@ -150,19 +150,23 @@ decide_refs() {
     fi
 }
 
+# These cache probes report through variables (check_cache: $cached,
+# recheck_cache: $overall, redo_check: $result) rather than stdout: they
+# run once per commit, and forking a command substitution per call is
+# what made fully-cached runs slow.
 check_cache() {
     if test -f "$cache/${1}_pass"; then pass=pass; else pass=''; fi
     if test -f "$cache/${1}_fail"; then fail=fail; else fail=''; fi
 
-    echo "$pass$fail"
+    cached="$pass$fail"
 }
 
 recheck_cache() {
-    results=$(check_cache "$1")
-    if [ "$results" = "passfail" ]; then
-        results=FLAPPY
+    check_cache "$1"
+    overall="$cached"
+    if [ "$overall" = "passfail" ]; then
+        overall=FLAPPY
     fi
-    echo $results
 }
 
 sync_cache() {
@@ -191,22 +195,21 @@ sync_cache() {
 }
 
 redo_check() {
-    result=$(check_cache "$1")
+    check_cache "$1"
+    result="$cached"
 
     if [ -z "$result" ]; then
         return
     elif [ "$redo" = "all" ]; then
-        return
+        result=''
     elif [ "$redo" = "pass" ] && [ "${result%fail}" = "pass" ]; then
-        return
+        result=''
     elif [ "$redo" = "fail" ] && [ "${result#pass}" = "fail" ]; then
-        return
+        result=''
     elif [ "$redo" = "both" ] && [ "${result}" = "passfail" ]; then
-        return
+        result=''
     elif [ "$result" = "passfail" ]; then
-        echo FLAPPY
-    else
-        echo "$result"
+        result=FLAPPY
     fi
 }
 
@@ -292,7 +295,7 @@ run_tests() {
     while read -r commit short small; do
         cache_key="${small}_${ver}"
 
-        result=$(redo_check "$cache_key")
+        redo_check "$cache_key"
 
         if test -n "$result"; then
             if test -z "$GIT_QUIET"; then
@@ -303,7 +306,7 @@ run_tests() {
             result=$(run_test)
 
             if test -z "$GIT_QUIET"; then
-                overall=$(recheck_cache "$cache_key")
+                recheck_cache "$cache_key"
 
                 if [ "$result" != "$overall" ]; then
                     progress out "$result ($overall)"
@@ -341,7 +344,7 @@ run_staged_test() {
         echo " ----|---------|---------|--------------"
     fi
 
-    result=$(redo_check "$cache_key")
+    redo_check "$cache_key"
 
     if test -n "$result"; then
         if test -z "$GIT_QUIET"; then
@@ -352,7 +355,7 @@ run_staged_test() {
         result=$(run_test staged)
 
         if test -z "$GIT_QUIET"; then
-            overall=$(recheck_cache "$cache_key")
+            recheck_cache "$cache_key"
 
             if [ "$result" != "$overall" ]; then
                 progress out "$result ($overall)"
