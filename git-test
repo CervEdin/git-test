@@ -51,7 +51,6 @@ CORE=$(git --exec-path)
 PATH="$CORE:$PATH"
 
 . git-sh-setup
-. git-sh-i18n
 
 CR="$(printf "\r")$(tput el)"
 NL='
@@ -72,8 +71,8 @@ lock() {
     mkdir -p "$cache"
     msg="There's a lock dir, as if there is a git-test already in progress."
     if ! mkdir "$cache"/testing >/dev/null 2>&1; then
-        echo "$(eval_gettext "$msg")" >&2
-        echo "$(eval_gettext "(lock: \${cache}/testing)")" >&2
+        echo "$msg" >&2
+        echo "(lock: ${cache}/testing)" >&2
         rc=5
         exit 5
     fi
@@ -90,15 +89,14 @@ progress() {
         if [ -z "$GIT_QUIET" ]; then
             printf "$CR%04d | %s | %s | " \
                    "$iteration" "$short" "$small" >&2
-            gettext "$2" >&2
+            printf '%s' "$2" >&2
         fi
     else
         if [ -z "$GIT_QUIET" ]; then
             printf "%s" "$CR" >&2
             printf "%04d | %s | %s | " \
                    "$iteration" "$short" "$small"
-            gettext "$2"
-            echo
+            echo "$2"
         fi
     fi
 }
@@ -149,7 +147,7 @@ decide_refs() {
     done
 
     if [ -z "$args" ]; then
-        gettext "Cowardly refusing to test the entire history.
+        printf '%s' "Cowardly refusing to test the entire history.
 (If that's what you really want, you must specify at least HEAD)" >&2
         rc=5
     else
@@ -193,7 +191,7 @@ sync_cache() {
     done
 
     if test -z "$GIT_QUIET"; then
-        echo "$(eval_gettext "Pulled \${synced} results from other worktrees")"
+        echo "Pulled $synced results from other worktrees"
     fi
 }
 
@@ -246,15 +244,15 @@ run_test() {
 
     if test -n "$pre"; then
         progress err "pre-action"
-        gettext "Running pre-action"            >$out
+        printf '%s' "Running pre-action"        >$out
         echo "--------"                         >$out
-        eval_gettext "Running: '\$pre'"         >$out
+        printf '%s' "Running: '$pre'"           >$out
         ( $pre ) >$out 2>&1 || true
     fi
 
-    gettext "Verifying"                         >$out
+    printf '%s' "Verifying"                     >$out
     echo "--------"                             >$out
-    eval_gettext "Running: '\$verify'"          >$out
+    printf '%s' "Running: '$verify'"            >$out
     progress err "testing"
     if ( eval "$verify" ) >$out 2>&1; then
         result=pass
@@ -264,9 +262,9 @@ run_test() {
 
     if test -n "$post"; then
         progress err "post-action"
-        gettext "Running post-action"           >$out
+        printf '%s' "Running post-action"       >$out
         echo "--------"                         >$out
-        gettext "Running: '\$post'"             >$out
+        printf '%s' "Running: '$post'"          >$out
         ( $post ) >$out 2>&1 || true
     fi
 
@@ -286,10 +284,8 @@ run_tests() {
     ver="$(git rev-parse --short=7 "$verification")"
 
     if [ -z "$GIT_QUIET" ]; then
-        gettext "iter | commit  | tree    | result"
-        echo
-        gettext " ----|---------|---------|--------------"
-        echo
+        echo "iter | commit  | tree    | result"
+        echo " ----|---------|---------|--------------"
     fi
 
     for commit in "$@"; do
@@ -342,10 +338,8 @@ run_staged_test() {
     cache_key="${small}_${ver}"
 
     if [ -z "$GIT_QUIET" ]; then
-        gettext "iter | commit  | tree    | result"
-        echo
-        gettext " ----|---------|---------|--------------"
-        echo
+        echo "iter | commit  | tree    | result"
+        echo " ----|---------|---------|--------------"
     fi
 
     result=$(redo_check "$cache_key")
@@ -403,7 +397,7 @@ parse_redo() {
     elif echo "$1" | grep "$BOTH_PATTERN" >/dev/null; then
         redo=both
     else
-        gettext "Unknown redo mode requested"
+        printf '%s' "Unknown redo mode requested"
         rc=1
         exit $rc
     fi
@@ -479,8 +473,7 @@ if [ "$1" = sync ]; then
     action=sync
     shift
     if test $# != 0; then
-        gettext "sync takes no arguments" >&2
-        echo >&2
+        echo "sync takes no arguments" >&2
         exit 129
     fi
 fi
@@ -535,14 +528,13 @@ if [ $action = clear ]; then
         count="$(echo "$commits" | wc -w)"
 
         if test 1 -gt "$count"; then
-            gettext "List of commits to clear is empty" 1>&2
+            printf '%s' "List of commits to clear is empty" 1>&2
             exit
         fi
 
         if test -z "$GIT_QUIET"; then
             args="$*"
-            eval_gettext "\$args will clear \$count commits"
-            echo
+            echo "$args will clear $count commits"
         fi
 
         for commit in $commits; do
@@ -557,14 +549,13 @@ if [ $action = clear ]; then
 fi
 
 if [ -z "$verify" ]; then
-    gettext "A verification action is required. Specify one using
+    echo "A verification action is required. Specify one using
   the argument --verify=\"...\"
 or
   configure it using 'git config test.verify ...'
 or
   the environment variable GIT_TEST_VERIFY
 "
-    echo
     exit 5
 fi
 
@@ -574,8 +565,7 @@ trap "atexit_cleanup" INT TERM EXIT
 
 if test -n "$staged_tree" ; then
     if test -z "$GIT_QUIET" ; then
-        gettext "Work tree is dirty; testing the staged tree in place."
-        echo
+        echo "Work tree is dirty; testing the staged tree in place."
     fi
     make_output_dirs
     run_staged_test
@@ -587,10 +577,10 @@ commits=( $(git rev-list --reverse "${refs[@]}" -- | tr "$NL" " ") )
 count="$(echo "${commits[@]}" | wc -w)"
 
 if test 1 -gt "$count"; then
-    gettext 'List of commits to test is empty' 1>&2
+    printf '%s' 'List of commits to test is empty' 1>&2
     exit
 elif test -z "$GIT_QUIET"; then
-    printf "$(eval_gettext "%s will test %d commits\n")" "${refs[*]}" "$count"
+    printf '%s will test %d commits\n' "${refs[*]}" "$count"
 fi
 
 make_output_dirs
