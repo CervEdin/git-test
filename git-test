@@ -214,10 +214,9 @@ redo_check() {
 }
 
 link_result() {
-    dest="../tree/${cache_key}_${result}"
-    iter="$(printf "%s/%s/%04d_%s" "$output" "$now" "$iteration" "$result")"
-
     if test -f "$output/tree/${cache_key}_${result}"; then
+        dest="../tree/${cache_key}_${result}"
+        iter="$(printf "%s/%s/%04d_%s" "$output" "$now" "$iteration" "$result")"
         ln -sf "$dest" "${iter}"
         ln -sf "$dest" "${output}/commit/${short}_${result}"
     fi
