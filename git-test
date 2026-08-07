@@ -286,7 +286,8 @@ run_tests() {
                 progress out "$result (cached)"
             fi
         else
-            result=$(run_test)
+            # a non-zero status from run_test means no result, not a failing test
+            result=$(run_test) || { rc=$?; exit $rc; }
 
             if test -z "$GIT_QUIET"; then
                 overall=$(recheck_cache "$cache_key")
@@ -534,7 +535,9 @@ fi
 
 lock
 
-trap "atexit_cleanup" INT TERM EXIT
+trap 'rc=130; atexit_cleanup' INT
+trap 'rc=143; atexit_cleanup' TERM
+trap 'atexit_cleanup' EXIT
 
 if test -n "$staged_tree" ; then
     if test -z "$GIT_QUIET" ; then
