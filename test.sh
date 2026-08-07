@@ -151,6 +151,27 @@ setup_for_redo() {
     touch .git/test-cache/${tree_c}_${ver}_fail
 }
 
+# Emulate Ctrl+C: SIGINT git-test's whole process group, the way a terminal
+# would. Exits with git-test's status, or 97 if the verify never started.
+# Must be called from the foreground: a backgrounded shell has SIGINT
+# ignored, and the whole git-test tree would inherit that.
+interrupt_git_test() {
+    rm -f started
+    PROJECT="$PROJECT" bash <<-'EOF'
+	set -m	# job control: the background job gets its own process group
+	$PROJECT -v master >out 2>err &
+	pid=$!
+	n=0
+	# interrupt only once the verify action has touched "started"
+	while ! test -f started && test $n -lt 100 ; do
+	    sleep 0.1 ; n=$((n + 1))
+	done
+	test -f started || exit 97
+	kill -INT -- "-$pid"	# negative pid: signal the whole group
+	wait $pid
+	EOF
+}
+
 unset GIT_TEST_CLEAN
 unset GIT_TEST_VERIFY
 
@@ -429,6 +450,33 @@ echo "now unstaged" >> subject
 $PROJECT -v --verify="grep SUT subject"              >out 2>err ; check_fail
 grep "Cannot test: You have unstaged changes." err   >/dev/null ; check
 git checkout -- subject                         >/dev/null 2>&1 ; check
+
+info "Interrupt (Ctrl+C) should not record a result"
+git switch master                               >/dev/null 2>&1 ; check
+$PROJECT --clear                                >/dev/null 2>&1 ; check
+git config --local test.verify "touch started && sleep 10"
+interrupt_git_test                                              ; check_fail
+test -f started                                                 ; check
+ls .git/test-cache/*_pass .git/test-cache/*_fail \
+                                                >/dev/null 2>&1 ; check_fail
+test "$(git symbolic-ref --short HEAD)" = "master"              ; check
+! test -d .git/test-cache/testing                               ; check
+
+info "Interrupted run should not leave a lock behind"
+$PROJECT -v --verify=true master                     >out 2>err ; check
+grep "already in progress" err                  >/dev/null 2>&1 ; check_fail
+
+info "Interrupt of a verify that catches SIGINT should not record a result"
+$PROJECT --clear                                >/dev/null 2>&1 ; check
+printf 'trap "exit 2" INT\ntouch started\nsleep 10\n' > catch_int
+git config --local test.verify "sh catch_int"
+interrupt_git_test                                              ; check_fail
+test -f started                                                 ; check
+ls .git/test-cache/*_pass .git/test-cache/*_fail \
+                                                >/dev/null 2>&1 ; check_fail
+test "$(git symbolic-ref --short HEAD)" = "master"              ; check
+! test -d .git/test-cache/testing                               ; check
+$PROJECT -v --verify=true master                     >out 2>err ; check
 
 info "TODO: check output report feature/s"
 
