@@ -61,6 +61,22 @@ iter commit  tree    result
 0001 0be28e9 6908e0d ... pass (cached)
 .fi
 
+.SH "TESTING A DIRTY WORK TREE"
+Normally git-test refuses to run unless the work tree is clean. As a
+convenience it also runs on a dirty work tree as long as every change is
+\fBstaged\fR. The index is then written to a tree and tested in place: no
+commit object is created and nothing is checked out, so the staged changes (and
+any in-progress merge) are left untouched. The commit column shows a null hash
+(0000000) since no commit backs the tree.
+
+The motivating case is testing a merge resolution before committing it: resolve
+the conflicts, git add them (recording the git-rerere resolution), and run git
+test while still mid-merge. Because the cache is keyed on the tree, committing
+that exact tree afterwards \(em the merge commit \(em reuses the result instead
+of re-running the test.
+
+If there are \fBunstaged\fR changes, the work tree would not match the tree
+recorded in the cache, so git-test falls back to its usual refusal.
 .SH "CONFIGURATION"
 To specify what to run on each tree, the arguments --pre, --post and --verify
 can be used to set housekeeping commands and a (required) verifying command.
