@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Copyright 2014-2015 Spotify AB. All rights reserved.
 #
@@ -202,6 +202,12 @@ link_result() {
 }
 
 run_test() {
+    # Runs in the $(...) subshell, so this trap is separate from the main
+    # shell's. An interrupt must never be recorded as a test result.
+    interrupted=
+    trap 'interrupted=130' INT
+    trap 'interrupted=143' TERM
+
     if test "$1" = staged ; then
         # The staged tree is already materialised in the work tree; there is
         # nothing to check out, so just test where we are.
@@ -225,6 +231,10 @@ run_test() {
         ( $pre ) >$out 2>&1 || true
     fi
 
+    if test -n "$interrupted"; then
+        exit "$interrupted"
+    fi
+
     gettext "Verifying"                         >$out
     echo "--------"                             >$out
     eval_gettext "Running: '\$verify'"          >$out
@@ -245,6 +255,10 @@ run_test() {
 
     if test "$out" != /dev/null; then
         mv "${out}" "${out}_${result}"
+    fi
+
+    if test -n "$interrupted"; then
+        exit "$interrupted"
     fi
 
     mkdir -p "${cache}"
@@ -280,7 +294,8 @@ run_tests() {
                 progress out "$result (cached)"
             fi
         else
-            result=$(run_test)
+            # a non-zero status from run_test means no result, not a failing test
+            result=$(run_test) || { rc=$?; exit $rc; }
 
             if test -z "$GIT_QUIET"; then
                 overall=$(recheck_cache "$cache_key")
@@ -528,7 +543,9 @@ fi
 
 lock
 
-trap "atexit_cleanup" INT TERM EXIT
+trap 'rc=130; atexit_cleanup' INT
+trap 'rc=143; atexit_cleanup' TERM
+trap 'atexit_cleanup' EXIT
 
 if test -n "$staged_tree" ; then
     if test -z "$GIT_QUIET" ; then

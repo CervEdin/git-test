@@ -60,6 +60,11 @@ iter commit  tree    result
 0000 83d611b 718c490 ... pass (cached)
 0001 0be28e9 6908e0d ... pass (cached)
 .fi
+.PP
+If git-test is interrupted (SIGINT/SIGTERM, e.g. Ctrl+C), no result is
+recorded for the commit being tested; git-test restores the starting point
+and exits with the conventional status for death by signal, 128+signo
+(130 for SIGINT, 143 for SIGTERM).
 
 .SH "TESTING A DIRTY WORK TREE"
 Normally git-test refuses to run unless the work tree is clean. As a
